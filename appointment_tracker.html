@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Appointment Document Tracking</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { text-align: center; }
+        #editSection { display: none; margin-bottom: 20px; }
+        #viewOnlyMessage { display: none; color: red; font-weight: bold; margin-bottom: 10px; }
+        form { margin-bottom: 20px; }
+        input, select, textarea { padding: 8px; margin-right: 10px; width: 200px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 10px; }
+        th { background-color: #f2f2f2; }
+        button { padding: 6px 12px; }
+    </style>
+</head>
+<body>
+    <h1>Appointment Document Tracking</h1>
+    
+    <!-- Password prompt for admin -->
+    <div id="authSection">
+        <input type="password" id="adminPassword" placeholder="Enter password to edit">
+        <button onclick="authenticate()">Login as Admin</button>
+    </div>
+
+    <!-- Message when in view-only mode -->
+    <div id="viewOnlyMessage">You are in view-only mode. Contact the administrator to edit.</div>
+
+    <!-- Form to add/edit documents -->
+    <div id="editSection">
+        <form id="docForm">
+            <input type="hidden" id="editIndex">
+            <input type="text" id="docName" placeholder="Document Name" required>
+            <br><br>
+            <!-- Dropdowns for various fields -->
+            <select id="appointmentType" required>
+                <option value="">Select Appointment Type</option>
+                <option value="Permanent">Permanent</option>
+                <option value="Temporary">Temporary</option>
+                <option value="Provisional">Provisional</option>
+            </select>
+            <select id="natureOfAppointment" required>
+                <option value="">Select Nature of Appointment</option>
+                <option value="Original">Original</option>
+                <option value="Reemployment">Reemployment</option>
+                <option value="Reappointment">Reappointment</option>
+                <option value="Substitute">Substitute</option>
+                <option value="Demotion">Demotion</option>
+                <option value="Reclass">Reclass</option>
+                <option value="Promotion">Promotion</option>
+                <option value="Transfer">Transfer</option>
+                <option value="Resign">Resign</option>
+                <option value="Death">Death</option>
+            </select>
+            <br><br>
+            <select id="docStatus" required>
+                <option value="Pending">Pending</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Drafted">Drafted</option>
+                <option value="HR Review and preparation of appointments">HR Review and preparation of appointments</option>
+                <option value="For Signature AOV">For Signature AOV</option>
+                <option value="For Signature ASDS">For Signature ASDS</option>
+                <option value="For Signature SDS">For Signature SDS</option>
+                <option value="With Compliance">With Compliance</option>
+                <option value="For Extraction and Validation">For Extraction and Validation</option>
+                <option value="RAI">RAI</option>
+                <option value="Ready for CSC">Ready for CSC</option>
+                <option value="Submitted to CSC">Submitted to CSC</option>
+                <option value="CSC Evaluation">CSC Evaluation</option>
+                <option value="CSC Approved">CSC Approved</option>
+                <option value="CSC Released">CSC Released</option>
+                <option value="Sortation and extraction for release to the appointee">Sortation and extraction for release to the appointee</option>
+                <option value="Ready for Release">Ready for Release</option>
+            </select>
+            <br><br>
+            <label for="remarks">Remarks:</label><br>
+            <textarea id="remarks" placeholder="Enter remarks" rows="3"></textarea>
+            <br><br>
+            <button type="submit">Save</button>
+            <button type="button" id="cancelEdit" style="display:none;">Cancel</button>
+        </form>
+    </div>
+
+    <!-- Search box -->
+    <input type="text" id="searchBox" placeholder="Search by Document Name" onkeyup="searchDocs()">
+
+    <!-- Display table -->
+    <table>
+        <thead>
+            <tr>
+                <th>Document Name</th>
+                <th>Appointment Type</th>
+                <th>Nature</th>
+                <th>Status</th>
+                <th>Remarks</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="docTableBody"></tbody>
+    </table>
+
+    <script>
+        const correctPassword = "YourPassword123"; // Change this to your password
+        let isAdmin = false;
+
+        const authSection = document.getElementById('authSection');
+        const viewOnlyMessage = document.getElementById('viewOnlyMessage');
+        const editSection = document.getElementById('editSection');
+
+        function authenticate() {
+            const enteredPassword = document.getElementById('adminPassword').value;
+            if (enteredPassword === correctPassword) {
+                isAdmin = true;
+                authSection.style.display = 'none';
+                viewOnlyMessage.style.display = 'none';
+                editSection.style.display = 'block';
+                displayDocuments();
+            } else {
+                alert('Incorrect password');
+                isAdmin = false;
+                authSection.style.display = 'block';
+                viewOnlyMessage.style.display = 'block';
+                editSection.style.display = 'none';
+            }
+        }
+
+        let documents = JSON.parse(localStorage.getItem('documents')) || [];
+
+        const form = document.getElementById('docForm');
+        const docNameInput = document.getElementById('docName');
+        const appointmentTypeSelect = document.getElementById('appointmentType');
+        const natureOfAppointmentSelect = document.getElementById('natureOfAppointment');
+        const docStatusSelect = document.getElementById('docStatus');
+        const remarksInput = document.getElementById('remarks');
+        const editIndexInput = document.getElementById('editIndex');
+        const cancelButton = document.getElementById('cancelEdit');
+
+        window.onload = function() {
+            if (isAdmin) {
+                displayDocuments();
+            } else {
+                document.getElementById('authSection').style.display = 'block';
+                document.getElementById('viewOnlyMessage').style.display = 'block';
+                document.getElementById('editSection').style.display = 'none';
+            }
+        };
+
+        form.addEventListener('submit', function(e) {
+            if (!isAdmin) {
+                alert('You do not have permission to edit.');
+                return;
+            }
+            e.preventDefault();
+            const name = docNameInput.value;
+            const appointmentType = appointmentTypeSelect.value;
+            const natureOfAppointment = natureOfAppointmentSelect.value;
+            const status = document.getElementById('docStatus').value;
+            const remarks = document.getElementById('remarks').value;
+            const editIndex = document.getElementById('editIndex').value;
+
+            const newDoc = { name, appointmentType, natureOfAppointment, status, remarks };
+
+            if (editIndex !== '') {
+                documents[editIndex] = newDoc;
+            } else {
+                documents.push(newDoc);
+            }
+
+            localStorage.setItem('documents', JSON.stringify(documents));
+            displayDocuments();
+            resetForm();
+        });
+
+        function displayDocuments() {
+            const tbody = document.getElementById('docTableBody');
+            tbody.innerHTML = '';
+
+            documents.forEach((doc, index) => {
+                const row = tbody.insertRow();
+                row.insertCell().innerText = doc.name;
+                row.insertCell().innerText = doc.appointmentType || '';
+                row.insertCell().innerText = doc.natureOfAppointment || '';
+                row.insertCell().innerText = doc.status;
+                row.insertCell().innerText = doc.remarks || '';
+
+                const actionsCell = row.insertCell();
+                if (isAdmin) {
+                    const editBtn = document.createElement('button');
+                    editBtn.innerText = 'Edit';
+                    editBtn.onclick = () => startEdit(index);
+                    actionsCell.appendChild(editBtn);
+                } else {
+                    actionsCell.innerText = 'View only';
+                }
+            });
+        }
+
+        function startEdit(index) {
+            if (!isAdmin) {
+                alert('You do not have permission to edit.');
+                return;
+            }
+            const doc = documents[index];
+            document.getElementById('docName').value = doc.name;
+            document.getElementById('appointmentType').value = doc.appointmentType || '';
+            document.getElementById('natureOfAppointment').value = doc.natureOfAppointment || '';
+            document.getElementById('docStatus').value = doc.status;
+            document.getElementById('remarks').value = doc.remarks || '';
+            document.getElementById('editIndex').value = index;
+            cancelButton.style.display = 'inline';
+
+            document.querySelector('#docForm button[type="submit"]').innerText = 'Update';
+        }
+
+        function resetForm() {
+            document.getElementById('docName').value = '';
+            document.getElementById('appointmentType').value = '';
+            document.getElementById('natureOfAppointment').value = '';
+            document.getElementById('docStatus').value = 'Pending';
+            document.getElementById('remarks').value = '';
+            document.getElementById('editIndex').value = '';
+            cancelButton.style.display = 'none';
+            document.querySelector('#docForm button[type="submit"]').innerText = 'Save';
+        }
+
+        document.getElementById('cancelEdit').addEventListener('click', function() {
+            resetForm();
+        });
+
+        function searchDocs() {
+            const input = document.getElementById('searchBox').value.toLowerCase();
+            const tbody = document.getElementById('docTableBody');
+            Array.from(tbody.rows).forEach(function(row) {
+                const name = row.cells[0].innerText.toLowerCase();
+                row.style.display = name.includes(input) ? '' : 'none';
+            });
+        }
+    </script>
+</body>
+</html>
